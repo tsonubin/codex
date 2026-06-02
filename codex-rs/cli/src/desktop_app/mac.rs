@@ -8,6 +8,7 @@ use tokio::process::Command;
 const CODEX_DMG_URL_ARM64: &str = "https://persistent.oaistatic.com/codex-app-prod/Codex.dmg";
 const CODEX_DMG_URL_X64: &str =
     "https://persistent.oaistatic.com/codex-app-prod/Codex-latest-x64.dmg";
+const CODEX_APP_BUNDLE_ID: &str = "com.openai.codex";
 
 pub async fn run_mac_app_open_or_install(
     workspace: PathBuf,
@@ -18,7 +19,7 @@ pub async fn run_mac_app_open_or_install(
             "Opening Codex Desktop at {app_path}...",
             app_path = app_path.display()
         );
-        open_codex_app(&app_path, &workspace).await?;
+        open_codex_app(&workspace).await?;
         return Ok(());
     }
     eprintln!("Codex Desktop not found; downloading installer...");
@@ -37,7 +38,7 @@ pub async fn run_mac_app_open_or_install(
         "Launching Codex Desktop from {installed_app}...",
         installed_app = installed_app.display()
     );
-    open_codex_app(&installed_app, &workspace).await?;
+    open_codex_app(&workspace).await?;
     Ok(())
 }
 
@@ -77,16 +78,15 @@ fn candidate_codex_app_paths() -> Vec<PathBuf> {
     paths
 }
 
-async fn open_codex_app(app_path: &Path, workspace: &Path) -> anyhow::Result<()> {
+async fn open_codex_app(workspace: &Path) -> anyhow::Result<()> {
     eprintln!(
         "Opening workspace {workspace}...",
         workspace = workspace.display()
     );
     let url = codex_new_thread_url(workspace);
+    let args = open_deep_link_args(&url);
     let status = Command::new("open")
-        .arg("-a")
-        .arg(app_path)
-        .arg(&url)
+        .args(&args)
         .status()
         .await
         .context("failed to invoke `open`")?;
@@ -96,10 +96,14 @@ async fn open_codex_app(app_path: &Path, workspace: &Path) -> anyhow::Result<()>
     }
 
     anyhow::bail!(
-        "`open -a {app_path} {url}` exited with {status}",
-        app_path = app_path.display(),
+        "`open -b {bundle_id} {url}` exited with {status}",
+        bundle_id = CODEX_APP_BUNDLE_ID,
         url = url
     );
+}
+
+fn open_deep_link_args(url: &str) -> [&str; 3] {
+    ["-b", CODEX_APP_BUNDLE_ID, url]
 }
 
 fn codex_new_thread_url(workspace: &Path) -> String {
@@ -303,6 +307,7 @@ fn parse_hdiutil_attach_mount_point(output: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::codex_new_thread_url;
+    use super::open_deep_link_args;
     use super::parse_hdiutil_attach_mount_point;
     use pretty_assertions::assert_eq;
     use std::path::Path;
@@ -343,6 +348,14 @@ mod tests {
                 "/new".to_string(),
                 vec![("path".to_string(), "/tmp/codex workspace/#1".to_string())],
             )
+        );
+    }
+
+    #[test]
+    fn open_deep_link_args_use_bundle_id() {
+        assert_eq!(
+            open_deep_link_args("codex://threads/new?path=%2Ftmp"),
+            ["-b", "com.openai.codex", "codex://threads/new?path=%2Ftmp"]
         );
     }
 }
