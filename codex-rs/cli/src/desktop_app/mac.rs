@@ -86,7 +86,7 @@ async fn open_codex_app(workspace: &Path) -> anyhow::Result<()> {
     let url = codex_new_thread_url(workspace);
     let args = open_deep_link_args(&url);
     let status = Command::new("open")
-        .args(&args)
+        .args(args)
         .status()
         .await
         .context("failed to invoke `open`")?;
@@ -95,11 +95,7 @@ async fn open_codex_app(workspace: &Path) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    anyhow::bail!(
-        "`open -b {bundle_id} {url}` exited with {status}",
-        bundle_id = CODEX_APP_BUNDLE_ID,
-        url = url
-    );
+    anyhow::bail!("`open -b {CODEX_APP_BUNDLE_ID} {url}` exited with {status}");
 }
 
 fn open_deep_link_args(url: &str) -> [&str; 3] {
